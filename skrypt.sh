@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # Variables setup
-VM1LAN=eth0
 VM2LAN=eth0
 VM2WAN=enp0s3
 
@@ -38,10 +37,10 @@ sudo iptables -t nat -A POSTROUTING -o $VM2WAN -j MASQUERADE
 sudo apt-get install -y bind9 bind9utils bind9-doc dnsutils
 
 # Create new dns zone
-echo "zone \"$DNSZONE\" {type master; file \"/etc/bind/db.$DNSZONE\";};" | sudo tee -a /etc/bind/named.local.conf
+echo "zone \"$DNSZONE\" {type master; file \"/etc/bind/db.$DNSZONE\";};" | sudo tee /etc/bind/named.conf.local
 
 # Create dns zone config
-sudo tee /etc/bind/db.$DNSZONE > dev/null <<EOF
+sudo tee /etc/bind/db.$DNSZONE > /dev/null <<EOF
 ;
 ; BIND data file for local loopback interface
 ;
@@ -60,7 +59,7 @@ vm1     IN      A       $VM1ADDR
 EOF
 
 # Override server config
-sudo tee /etc/bind/named.conf.options > dev/null <<EOF
+sudo tee /etc/bind/named.conf.options > /dev/null <<EOF
 options {
         directory "/var/cache/bind";
 
@@ -89,10 +88,18 @@ options {
 
         recursion yes;
         allow-recursion { any; };
-        listen-on {$VM2ADDR};
+        listen-on { $VM2ADDR; };
         listen-on-v6 { any; };
         allow-transfer { none; };
 };
+EOF
+
+# Restart bind9
+sudo systemctl restart bind9
+
+# Override dns resolution
+sudo tee /etc/resolv.conf > /dev/null <<EOF
+nameserver 127.0.0.1
 EOF
 
 # --- DHCP setup ---
@@ -100,7 +107,7 @@ EOF
 sudo apt-get install -y isc-dhcp-server
 
 # Override default isc-dhcp-server config
-sudo tee /etc/default/isc-dhcp-server > dev/null <<EOF
+sudo tee /etc/default/isc-dhcp-server > /dev/null <<EOF
 # Defaults for isc-dhcp-server (sourced by /etc/init.d/isc-dhcp-server)
 
 # Path to dhcpd's config file (default: /etc/dhcp/dhcpd.conf).
@@ -122,7 +129,7 @@ INTERFACESv6=""
 EOF
 
 # Override dhcp.conf
-sudo tee /etc/dhcp/dhcpd.conf > dev/null <<EOF
+sudo tee /etc/dhcp/dhcpd.conf > /dev/null <<EOF
 # dhcpd.conf
 #
 # Sample configuration file for ISC dhcpd
@@ -143,7 +150,7 @@ ddns-update-style none;
 
 # If this DHCP server is the official DHCP server for the local
 # network, the authoritative directive should be uncommented.
-#authoritative;
+authoritative;
 
 # Use this to send dhcp log messages to a different log file (you also
 # have to hack syslog.conf to complete the redirection).
